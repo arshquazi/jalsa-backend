@@ -1,0 +1,4 @@
+node_modules/
+.env
+prisma/jalsa.db
+prisma/jalsa.db-journal

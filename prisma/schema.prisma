@@ -1,0 +1,132 @@
+// Switch provider to "postgresql" and update DATABASE_URL for production
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─── Admin ───────────────────────────────────────────────────
+model Admin {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+}
+
+// ─── Rooms ───────────────────────────────────────────────────
+model Room {
+  id           Int           @id @default(autoincrement())
+  name         String
+  slug         String        @unique
+  description  String
+  pricePerNight Float
+  maxOccupancy Int
+  amenities    String        // JSON array stored as string
+  images       String        // JSON array of image URLs
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  bookings     RoomBooking[]
+}
+
+// ─── Room Bookings ────────────────────────────────────────────
+model RoomBooking {
+  id            Int      @id @default(autoincrement())
+  roomId        Int
+  room          Room     @relation(fields: [roomId], references: [id])
+  firstName     String
+  lastName      String
+  email         String
+  phone         String
+  checkIn       DateTime
+  checkOut      DateTime
+  guests        Int
+  specialRequests String?
+  totalAmount   Float
+  status        String   @default("pending")  // pending | confirmed | cancelled
+  paymentStatus String   @default("unpaid")   // unpaid | paid | refunded
+  createdAt     DateTime @default(now())
+}
+
+// ─── Table Reservations ───────────────────────────────────────
+model TableReservation {
+  id          Int      @id @default(autoincrement())
+  name        String
+  email       String
+  phone       String
+  date        DateTime
+  time        String   // "19:00", "20:30" etc.
+  partySize   Int
+  occasion    String?
+  notes       String?
+  status      String   @default("pending")  // pending | confirmed | cancelled
+  createdAt   DateTime @default(now())
+}
+
+// ─── Menu ─────────────────────────────────────────────────────
+model MenuCategory {
+  id        Int        @id @default(autoincrement())
+  name      String
+  sortOrder Int        @default(0)
+  items     MenuItem[]
+}
+
+model MenuItem {
+  id          Int          @id @default(autoincrement())
+  categoryId  Int
+  category    MenuCategory @relation(fields: [categoryId], references: [id])
+  name        String
+  description String
+  price       Float
+  image       String?
+  isVeg       Boolean      @default(true)
+  isAvailable Boolean      @default(true)
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+}
+
+// ─── Gallery ──────────────────────────────────────────────────
+model GalleryImage {
+  id        Int      @id @default(autoincrement())
+  url       String
+  caption   String?
+  category  String   @default("general")  // rooms | dining | events | general
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+// ─── Reviews ──────────────────────────────────────────────────
+model Review {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  rating    Int      // 1-5
+  title     String?
+  body      String
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// ─── Contact Enquiries ────────────────────────────────────────
+model ContactEnquiry {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// ─── Newsletter ───────────────────────────────────────────────
+model NewsletterSubscriber {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+}
