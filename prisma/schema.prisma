@@ -1,6 +1,6 @@
 // Switch provider to "postgresql" and update DATABASE_URL for production
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
