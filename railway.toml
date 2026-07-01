@@ -3,6 +3,7 @@ builder = "nixpacks"
 
 [deploy]
 startCommand = "node src/app.js"
+preDeployCommand = "npx prisma migrate deploy && node prisma/seed.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
