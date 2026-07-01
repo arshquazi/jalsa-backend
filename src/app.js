@@ -88,10 +88,10 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`\n🏨 Jalsa Resort API running on http://localhost:${PORT}`);
-  console.log(`📊 Admin panel: http://localhost:${PORT}/admin`);
-  console.log(`❤️  Health check: http://localhost:${PORT}/health\n`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n🏨 Jalsa Resort API running on http://0.0.0.0:${PORT}`);
+  console.log(`📊 Admin panel: http://0.0.0.0:${PORT}/admin`);
+  console.log(`❤️  Health check: http://0.0.0.0:${PORT}/health\n`);
 });
 
 module.exports = app;
