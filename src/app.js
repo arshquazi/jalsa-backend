@@ -11,6 +11,9 @@ const adminRoutes = require('./routes/admin');
 
 const app = express();
 
+// Trust Railway's reverse proxy (required for express-rate-limit v7+)
+app.set('trust proxy', 1);
+
 // ── Security headers ──────────────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
