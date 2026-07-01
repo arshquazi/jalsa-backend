@@ -4,24 +4,29 @@ const prisma = require('../config/database');
 
 // POST /api/admin/login
 async function login(req, res) {
-  const { email, password } = req.body;
   try {
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+
     const admin = await prisma.admin.findUnique({ where: { email } });
     if (!admin) return res.status(401).json({ error: 'Invalid credentials' });
 
     const valid = await bcrypt.compare(password, admin.password);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return res.status(500).json({ error: 'JWT_SECRET not configured' });
+
     const token = jwt.sign(
       { id: admin.id, email: admin.email, name: admin.name },
-      process.env.JWT_SECRET,
+      secret,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
     res.json({ token, admin: { id: admin.id, email: admin.email, name: admin.name } });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Login error:', e);
+    res.status(500).json({ error: e.message || 'Server error' });
   }
 }
 
