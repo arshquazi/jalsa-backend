@@ -39,9 +39,9 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
 app.use(
   cors({
     origin: (origin, cb) => {
-      // Allow requests with no origin (Postman, curl, mobile apps)
-      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-      cb(new Error(`CORS blocked: ${origin}`));
+      // Allow: no origin (curl/Postman), same-origin (admin panel), or listed origins
+      if (!origin || allowedOrigins.includes(origin) || origin === process.env.RAILWAY_PUBLIC_DOMAIN) return cb(null, true);
+      cb(null, false);
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
