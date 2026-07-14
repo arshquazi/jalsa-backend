@@ -1,5 +1,7 @@
 const nodemailer = require('nodemailer');
 
+// SMTP transport — used for local development. On Railway (which blocks
+// outbound SMTP on the trial plan) the Brevo HTTP API is used instead.
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -10,7 +12,36 @@ const transporter = nodemailer.createTransport({
 
 const resortName = process.env.RESORT_NAME || 'Jalsa Hotel & Resort';
 const adminEmail = process.env.ADMIN_EMAIL || 'admin@jalsaresort.com';
-const fromAddress = `"${resortName}" <${process.env.EMAIL_USER}>`;
+const senderEmail = process.env.EMAIL_USER || adminEmail;
+const fromAddress = `"${resortName}" <${senderEmail}>`;
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+
+// Unified sender: uses Brevo's HTTP API (port 443, never blocked) when a
+// BREVO_API_KEY is configured; otherwise falls back to SMTP for local dev.
+async function sendMail({ to, subject, html }) {
+  if (BREVO_API_KEY) {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': BREVO_API_KEY,
+        'content-type': 'application/json',
+        accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: resortName, email: senderEmail },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      throw new Error(`Brevo API ${res.status}: ${detail}`);
+    }
+    return res.json();
+  }
+  return transporter.sendMail({ from: fromAddress, to, subject, html });
+}
 
 // Send to guest + notify admin
 async function sendRoomBookingEmails({ booking, room }) {
@@ -19,8 +50,7 @@ async function sendRoomBookingEmails({ booking, room }) {
   );
 
   // Guest confirmation
-  await transporter.sendMail({
-    from: fromAddress,
+  await sendMail({
     to: booking.email,
     subject: `Booking Confirmed – ${room.name} | ${resortName}`,
     html: `
@@ -44,8 +74,7 @@ async function sendRoomBookingEmails({ booking, room }) {
   });
 
   // Admin notification
-  await transporter.sendMail({
-    from: fromAddress,
+  await sendMail({
     to: adminEmail,
     subject: `New Room Booking #${booking.id} – ${room.name}`,
     html: `
@@ -60,8 +89,7 @@ async function sendRoomBookingEmails({ booking, room }) {
 
 async function sendTableReservationEmails({ reservation }) {
   // Guest confirmation
-  await transporter.sendMail({
-    from: fromAddress,
+  await sendMail({
     to: reservation.email,
     subject: `Table Reservation Confirmed | ${resortName}`,
     html: `
@@ -82,8 +110,7 @@ async function sendTableReservationEmails({ reservation }) {
   });
 
   // Admin notification
-  await transporter.sendMail({
-    from: fromAddress,
+  await sendMail({
     to: adminEmail,
     subject: `New Table Reservation – ${reservation.name} (${reservation.partySize} pax)`,
     html: `
@@ -96,8 +123,7 @@ async function sendTableReservationEmails({ reservation }) {
 }
 
 async function sendContactEnquiryEmail({ enquiry }) {
-  await transporter.sendMail({
-    from: fromAddress,
+  await sendMail({
     to: adminEmail,
     subject: `New Enquiry: ${enquiry.subject} – ${enquiry.name}`,
     html: `
@@ -111,8 +137,7 @@ async function sendContactEnquiryEmail({ enquiry }) {
   });
 
   // Auto-reply to guest
-  await transporter.sendMail({
-    from: fromAddress,
+  await sendMail({
     to: enquiry.email,
     subject: `We received your message | ${resortName}`,
     html: `
@@ -126,36 +151,28 @@ async function sendContactEnquiryEmail({ enquiry }) {
   });
 }
 
-// Diagnostic: verify SMTP connection and send a test email. Returns detailed result.
+// Diagnostic: send a live test email through the active provider and return the result.
 async function runEmailDiagnostic(toOverride) {
+  const to = toOverride || adminEmail;
   const result = {
+    provider: BREVO_API_KEY ? 'Brevo HTTP API' : 'Gmail SMTP',
     config: {
-      service: 'gmail',
-      user: process.env.EMAIL_USER || '(missing)',
-      passSet: !!process.env.EMAIL_PASS,
-      passLength: (process.env.EMAIL_PASS || '').length,
+      senderEmail,
       adminEmail,
+      brevoKeySet: !!BREVO_API_KEY,
+      smtpUser: process.env.EMAIL_USER || '(missing)',
+      smtpPassSet: !!process.env.EMAIL_PASS,
     },
-    verify: null,
     send: null,
   };
 
   try {
-    await transporter.verify();
-    result.verify = 'OK — SMTP connection and credentials accepted';
-  } catch (e) {
-    result.verify = `FAILED — ${e.message}`;
-    return result; // no point trying to send if verify fails
-  }
-
-  try {
-    const info = await transporter.sendMail({
-      from: fromAddress,
-      to: toOverride || adminEmail,
+    await sendMail({
+      to,
       subject: 'Jalsa Resort — Email Diagnostic Test',
-      text: 'This is a live test from your Railway server. If you received this, email notifications are working.',
+      html: '<p>This is a live test from your Railway server. If you received this, email notifications are working. ✅</p>',
     });
-    result.send = `OK — sent to ${toOverride || adminEmail} (messageId: ${info.messageId})`;
+    result.send = `OK — sent to ${to}`;
   } catch (e) {
     result.send = `FAILED — ${e.message}`;
   }
