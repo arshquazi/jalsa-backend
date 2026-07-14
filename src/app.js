@@ -79,6 +79,18 @@ app.get('/', (req, res) => {
 // ── Health check ──────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
+// ── Email diagnostic (visit in browser to see the real SMTP error) ──
+// Optional ?to=youremail@gmail.com to send the test to a specific address.
+app.get('/health/email', async (req, res) => {
+  const { runEmailDiagnostic } = require('./config/email');
+  try {
+    const result = await runEmailDiagnostic(req.query.to);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── 404 ───────────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 

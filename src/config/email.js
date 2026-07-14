@@ -126,9 +126,47 @@ async function sendContactEnquiryEmail({ enquiry }) {
   });
 }
 
+// Diagnostic: verify SMTP connection and send a test email. Returns detailed result.
+async function runEmailDiagnostic(toOverride) {
+  const result = {
+    config: {
+      service: 'gmail',
+      user: process.env.EMAIL_USER || '(missing)',
+      passSet: !!process.env.EMAIL_PASS,
+      passLength: (process.env.EMAIL_PASS || '').length,
+      adminEmail,
+    },
+    verify: null,
+    send: null,
+  };
+
+  try {
+    await transporter.verify();
+    result.verify = 'OK — SMTP connection and credentials accepted';
+  } catch (e) {
+    result.verify = `FAILED — ${e.message}`;
+    return result; // no point trying to send if verify fails
+  }
+
+  try {
+    const info = await transporter.sendMail({
+      from: fromAddress,
+      to: toOverride || adminEmail,
+      subject: 'Jalsa Resort — Email Diagnostic Test',
+      text: 'This is a live test from your Railway server. If you received this, email notifications are working.',
+    });
+    result.send = `OK — sent to ${toOverride || adminEmail} (messageId: ${info.messageId})`;
+  } catch (e) {
+    result.send = `FAILED — ${e.message}`;
+  }
+
+  return result;
+}
+
 module.exports = {
   transporter,
   sendRoomBookingEmails,
   sendTableReservationEmails,
   sendContactEnquiryEmail,
+  runEmailDiagnostic,
 };
