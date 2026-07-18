@@ -79,9 +79,12 @@ app.get('/', (req, res) => {
 // ── Health check ──────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
-// ── Email diagnostic (visit in browser to see the real SMTP error) ──
-// Optional ?to=youremail@gmail.com to send the test to a specific address.
+// ── Email diagnostic (token-protected to prevent abuse of the mail quota) ──
+// Usage: /health/email?token=<JWT_SECRET>&to=you@example.com
 app.get('/health/email', async (req, res) => {
+  if (!process.env.JWT_SECRET || req.query.token !== process.env.JWT_SECRET) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   const { runEmailDiagnostic } = require('./config/email');
   try {
     const result = await runEmailDiagnostic(req.query.to);
