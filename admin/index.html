@@ -73,6 +73,11 @@ window.onload = () => {
   if (token) showDashboard();
 };
 
+// Escape a value for safe use inside an HTML attribute
+const esc = (s) => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+  .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 async function apiFetch(path, opts = {}) {
   const res = await fetch(API + path, {
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -218,8 +223,24 @@ const tabs = {
             <td class="p-3 font-medium">₹${i.price}</td>
             <td class="p-3">${i.isAvailable ? '<span class="text-green-700 text-xs">Available</span>' : '<span class="text-red-500 text-xs">Unavailable</span>'}</td>
             <td class="p-3 flex gap-2">
+              <button onclick="showEditItem(${i.id})" class="text-xs bg-green-900 text-white px-2 py-1 rounded">Edit</button>
               <button onclick="toggleItemAvail(${i.id}, ${!i.isAvailable})" class="text-xs bg-gray-100 px-2 py-1 rounded">${i.isAvailable ? 'Disable' : 'Enable'}</button>
               <button onclick="deleteMenuItem(${i.id})" class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">Delete</button>
+            </td>
+          </tr>
+          <tr id="itemEdit${i.id}" class="hidden bg-yellow-50 border-t">
+            <td colspan="5" class="p-3">
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
+                <input id="iName${i.id}" value="${esc(i.name)}" placeholder="Name" class="border rounded px-2 py-1">
+                <input id="iDesc${i.id}" value="${esc(i.description)}" placeholder="Description" class="border rounded px-2 py-1 md:col-span-2">
+                <input id="iPrice${i.id}" type="number" value="${i.price}" placeholder="Price ₹" class="border rounded px-2 py-1">
+                <select id="iVeg${i.id}" class="border rounded px-2 py-1">
+                  <option value="true" ${i.isVeg ? 'selected' : ''}>Veg 🟢</option>
+                  <option value="false" ${!i.isVeg ? 'selected' : ''}>Non-Veg 🔴</option>
+                </select>
+                <button onclick="saveItem(${i.id})" class="text-xs bg-green-900 text-white px-3 py-1 rounded">Save</button>
+                <button onclick="tabs.menu()" class="text-xs bg-gray-200 px-3 py-1 rounded">Cancel</button>
+              </div>
             </td>
           </tr>`).join('')}
         </tbody></table></div></div>`;
@@ -233,14 +254,36 @@ const tabs = {
       <h2 class="font-bold text-lg mb-3 text-green-900">Rooms (${rooms.length})</h2>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         ${rooms.map(r => `<div class="bg-white rounded shadow p-4">
-          <div class="flex justify-between items-start mb-2">
-            <h3 class="font-semibold text-green-900">${r.name}</h3>
-            <span class="text-xs ${r.isActive ? 'text-green-600' : 'text-red-500'}">${r.isActive ? 'Active' : 'Inactive'}</span>
+          <div id="roomView${r.id}">
+            <img src="${esc((r.images || [])[0] || '')}" class="w-full h-28 object-cover rounded mb-2" onerror="this.style.display='none'">
+            <div class="flex justify-between items-start mb-2">
+              <h3 class="font-semibold text-green-900">${r.name}</h3>
+              <span class="text-xs ${r.isActive ? 'text-green-600' : 'text-red-500'}">${r.isActive ? 'Active' : 'Inactive'}</span>
+            </div>
+            <p class="text-xs text-gray-500 mb-2">${r.description.substring(0, 100)}…</p>
+            <p class="font-bold text-green-800 mb-1">₹${r.pricePerNight.toLocaleString('en-IN')}/night</p>
+            <p class="text-xs text-gray-500 mb-3">Max: ${r.maxOccupancy} guests</p>
+            <div class="flex gap-2">
+              <button onclick="showEditRoom(${r.id})" class="text-xs bg-green-900 text-white px-3 py-1 rounded flex-1">Edit</button>
+              <button onclick="toggleRoom(${r.id}, ${!r.isActive})" class="text-xs bg-gray-100 px-3 py-1 rounded flex-1">${r.isActive ? 'Deactivate' : 'Activate'}</button>
+            </div>
           </div>
-          <p class="text-xs text-gray-500 mb-2">${r.description.substring(0, 100)}…</p>
-          <p class="font-bold text-green-800 mb-1">₹${r.pricePerNight.toLocaleString('en-IN')}/night</p>
-          <p class="text-xs text-gray-500 mb-3">Max: ${r.maxOccupancy} guests</p>
-          <button onclick="toggleRoom(${r.id}, ${!r.isActive})" class="text-xs bg-gray-100 px-3 py-1 rounded w-full">${r.isActive ? 'Deactivate' : 'Activate'}</button>
+          <div id="roomEdit${r.id}" class="hidden text-sm space-y-2">
+            <label class="block text-xs text-gray-500">Room name</label>
+            <input id="rName${r.id}" value="${esc(r.name)}" class="border rounded px-2 py-1 w-full">
+            <label class="block text-xs text-gray-500">Price per night (₹)</label>
+            <input id="rPrice${r.id}" type="number" value="${r.pricePerNight}" class="border rounded px-2 py-1 w-full">
+            <label class="block text-xs text-gray-500">Max guests</label>
+            <input id="rOcc${r.id}" type="number" value="${r.maxOccupancy}" class="border rounded px-2 py-1 w-full">
+            <label class="block text-xs text-gray-500">Description</label>
+            <textarea id="rDesc${r.id}" rows="3" class="border rounded px-2 py-1 w-full">${esc(r.description)}</textarea>
+            <label class="block text-xs text-gray-500">Photo URL</label>
+            <input id="rImg${r.id}" value="${esc((r.images || [])[0] || '')}" class="border rounded px-2 py-1 w-full">
+            <div class="flex gap-2 pt-1">
+              <button onclick="saveRoom(${r.id})" class="text-xs bg-green-900 text-white px-3 py-1 rounded flex-1">Save</button>
+              <button onclick="tabs.rooms()" class="text-xs bg-gray-200 px-3 py-1 rounded flex-1">Cancel</button>
+            </div>
+          </div>
         </div>`).join('')}
       </div>`;
   },
@@ -376,6 +419,41 @@ async function deleteMenuItem(id) {
 async function toggleRoom(id, isActive) {
   await apiFetch(`/admin/rooms/${id}`, { method: 'PUT', body: JSON.stringify({ isActive }) });
   tabs.rooms();
+}
+
+function showEditRoom(id) {
+  document.getElementById(`roomView${id}`).classList.add('hidden');
+  document.getElementById(`roomEdit${id}`).classList.remove('hidden');
+}
+
+async function saveRoom(id) {
+  const img = document.getElementById(`rImg${id}`).value.trim();
+  try {
+    await apiFetch(`/admin/rooms/${id}`, { method: 'PUT', body: JSON.stringify({
+      name: document.getElementById(`rName${id}`).value.trim(),
+      pricePerNight: document.getElementById(`rPrice${id}`).value,
+      maxOccupancy: document.getElementById(`rOcc${id}`).value,
+      description: document.getElementById(`rDesc${id}`).value.trim(),
+      images: img ? [img] : [],
+    })});
+    tabs.rooms();
+  } catch (e) { alert(e.error || 'Could not save room'); }
+}
+
+function showEditItem(id) {
+  document.getElementById(`itemEdit${id}`).classList.toggle('hidden');
+}
+
+async function saveItem(id) {
+  try {
+    await apiFetch(`/admin/menu/items/${id}`, { method: 'PUT', body: JSON.stringify({
+      name: document.getElementById(`iName${id}`).value.trim(),
+      description: document.getElementById(`iDesc${id}`).value.trim(),
+      price: document.getElementById(`iPrice${id}`).value,
+      isVeg: document.getElementById(`iVeg${id}`).value === 'true',
+    })});
+    tabs.menu();
+  } catch (e) { alert(e.error || 'Could not save item'); }
 }
 
 async function addGalleryImage() {
